@@ -51,6 +51,12 @@ It returns the detected text as a JSON array."#
         kind: vec![ParameterType::String],
         required: true,
       },
+      Parameter {
+        identifier: message::SAMPLE_RATE_PARAMETER.to_string(),
+        label: "The video sampling rate".to_string(),
+        kind: vec![ParameterType::Integer],
+        required: false,
+      },
     ]
   }
 

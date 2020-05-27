@@ -21,6 +21,7 @@ use std::time::Instant;
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const LANGUAGE_PARAMETER: &str = "language";
 pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
+pub const SAMPLE_RATE_PARAMETER: &str = "sample_rate";
 
 #[derive(Debug, Serialize)]
 pub struct FrameAnalysis {
@@ -39,49 +40,16 @@ pub fn process(
   job: &Job,
   job_result: JobResult,
 ) -> Result<JobResult, MessageError> {
-  let source_path = job
-    .get_string_parameter(SOURCE_PATH_PARAMETER)
-    .ok_or_else(|| {
-      MessageError::ProcessingError(
-        job_result
-          .clone()
-          .with_status(JobStatus::Error)
-          .with_message(&format!(
-            "Invalid job message: missing expected '{}' parameter.",
-            SOURCE_PATH_PARAMETER
-          )),
-      )
-    })?;
+  let source_path = get_required_string_parameter_value(job, &job_result, SOURCE_PATH_PARAMETER)?;
+  let language = get_required_string_parameter_value(job, &job_result, LANGUAGE_PARAMETER)?;
+  let destination_path =
+    get_required_string_parameter_value(job, &job_result, DESTINATION_PATH_PARAMETER)?;
 
-  let language = job
-    .get_string_parameter(LANGUAGE_PARAMETER)
-    .ok_or_else(|| {
-      MessageError::ProcessingError(
-        job_result
-          .clone()
-          .with_status(JobStatus::Error)
-          .with_message(&format!(
-            "Invalid job message: missing expected '{}' parameter.",
-            LANGUAGE_PARAMETER
-          )),
-      )
-    })?;
+  let sample_rate = job
+    .get_integer_parameter(SAMPLE_RATE_PARAMETER)
+    .unwrap_or(1);
 
-  let destination_path = job
-    .get_string_parameter(DESTINATION_PATH_PARAMETER)
-    .ok_or_else(|| {
-      MessageError::ProcessingError(
-        job_result
-          .clone()
-          .with_status(JobStatus::Error)
-          .with_message(&format!(
-            "Invalid job message: missing expected '{}' parameter.",
-            DESTINATION_PATH_PARAMETER
-          )),
-      )
-    })?;
-
-  let result = apply_ocr(&source_path, &language).map_err(|error| {
+  let result = apply_ocr(&source_path, &language, sample_rate as usize).map_err(|error| {
     MessageError::ProcessingError(
       job_result
         .clone()
@@ -96,7 +64,25 @@ pub fn process(
   Ok(job_result.with_status(JobStatus::Completed))
 }
 
-fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
+fn get_required_string_parameter_value(
+  job: &Job,
+  job_result: &JobResult,
+  parameter_key: &str,
+) -> Result<String, MessageError> {
+  job.get_string_parameter(parameter_key).ok_or_else(|| {
+    MessageError::ProcessingError(
+      job_result
+        .clone()
+        .with_status(JobStatus::Error)
+        .with_message(&format!(
+          "Invalid job message: missing expected '{}' parameter.",
+          parameter_key
+        )),
+    )
+  })
+}
+
+fn apply_ocr(filename: &str, language: &str, sample_rate: usize) -> Result<String, String> {
   let mut context = FormatContext::new(filename)?;
   context.open_input()?;
 
@@ -151,6 +137,11 @@ fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
 
         if let Ok((_audio_frames, video_frames)) = graph.process(&[], &[frame]) {
           for video_frame in &video_frames {
+            if frame_count % sample_rate != 0 {
+              frame_count += 1;
+              continue;
+            }
+
             let buffer_size = (*video_frame.frame).linesize[0] * (*video_frame.frame).height;
 
             let av_pix_fmt_desc = av_pix_fmt_desc_get(AVPixelFormat::AV_PIX_FMT_RGB24);
