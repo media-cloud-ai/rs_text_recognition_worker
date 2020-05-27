@@ -5,10 +5,8 @@ use mcai_worker_sdk::{McaiChannel, MessageError, MessageEvent, Version};
 
 mod message;
 
-macro_rules! crate_version {
-  () => {
-    env!("CARGO_PKG_VERSION")
-  };
+pub mod built_info {
+  include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 #[derive(Debug)]
@@ -30,7 +28,7 @@ It returns the detected text as a JSON array."#
   }
 
   fn get_version(&self) -> Version {
-    Version::parse(crate_version!()).expect("unable to locate Package version")
+    Version::parse(built_info::PKG_VERSION).expect("unable to locate Package version")
   }
 
   fn get_parameters(&self) -> Vec<Parameter> {
