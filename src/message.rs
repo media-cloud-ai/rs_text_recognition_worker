@@ -3,7 +3,7 @@ use mcai_worker_sdk::{debug, trace};
 use mcai_worker_sdk::{McaiChannel, MessageError, ParametersContainer};
 use serde::Serialize;
 use stainless_ffmpeg::{
-  filter_graph::FilterGraph, format_context::FormatContext, order,
+  filter_graph::FilterGraph, format_context::FormatContext, order::filter::Filter,
   order::filter_output::FilterOutput, order::ParameterValue, packet::Packet,
   video_decoder::VideoDecoder,
 };
@@ -49,7 +49,7 @@ pub fn process(
     .get_integer_parameter(SAMPLE_RATE_PARAMETER)
     .unwrap_or(1);
 
-  let result = apply_ocr(&source_path, &language, sample_rate as usize).map_err(|error| {
+  let result = apply_ocr(&source_path, &language, sample_rate as usize, None).map_err(|error| {
     MessageError::ProcessingError(
       job_result
         .clone()
@@ -82,7 +82,7 @@ fn get_required_string_parameter_value(
   })
 }
 
-fn apply_ocr(filename: &str, language: &str, sample_rate: usize) -> Result<String, String> {
+fn apply_ocr(filename: &str, language: &str, sample_rate: usize, coordinates: Option<(u32, u32, u32, u32)>) -> Result<String, String> {
   let mut context = FormatContext::new(filename)?;
   context.open_input()?;
 
@@ -93,25 +93,55 @@ fn apply_ocr(filename: &str, language: &str, sample_rate: usize) -> Result<Strin
   graph.add_input_from_video_decoder("video_input", &video_decoder)?;
   graph.add_video_output("video_output")?;
 
-  let parameters: HashMap<String, ParameterValue> = [("pix_fmts", "rgb24")]
+  let format_filter_parameters: HashMap<String, ParameterValue> = [("pix_fmts", "rgb24")]
     .iter()
     .cloned()
     .map(|(key, value)| (key.to_string(), ParameterValue::String(value.to_string())))
     .collect();
 
-  let filter_definition = order::filter::Filter {
+  let format_filter_definition = Filter {
     name: "format".to_string(),
     label: Some("format_filter".to_string()),
-    parameters,
+    parameters: format_filter_parameters,
     inputs: None,
     outputs: Some(vec![FilterOutput {
       stream_label: "video_output".to_string(),
     }]),
   };
 
-  let filter = graph.add_filter(&filter_definition)?;
-  graph.connect_input("video_input", 0, &filter, 0)?;
-  graph.connect_output(&filter, 0, "video_output", 0)?;
+  let format_filter = graph.add_filter(&format_filter_definition)?;
+
+  if let Some((h1, h2, w1, w2)) = coordinates {
+    let out_w = h2 - h1;
+    let out_h = w2 - w1;
+
+    let crop_filter_parameters: HashMap<String, ParameterValue> = [
+      ("out_w", out_w.to_string()),
+      ("out_h", out_h.to_string()),
+      ("x", w1.to_string()),
+      ("y", h1.to_string()),
+    ]
+      .iter()
+      .cloned()
+      .map(|(key, value)| (key.to_string(), ParameterValue::String(value)))
+      .collect();
+
+    let crop_filter_definition = Filter {
+      name: "crop".to_string(),
+      label: Some("crop_filter".to_string()),
+      parameters: crop_filter_parameters,
+      inputs: None,
+      outputs: None,
+    };
+    let crop_filter = graph.add_filter(&crop_filter_definition)?;
+
+    graph.connect_input("video_input", 0, &crop_filter, 0)?;
+    graph.connect(&crop_filter, 0, &format_filter, 0)?;
+  } else {
+    graph.connect_input("video_input", 0, &format_filter, 0)?;
+  }
+
+  graph.connect_output(&format_filter, 0, "video_output", 0)?;
 
   graph.validate()?;
 
@@ -184,8 +214,15 @@ fn apply_ocr(filename: &str, language: &str, sample_rate: usize) -> Result<Strin
             debug!("Result computed in {} ms:", chrono.elapsed().as_millis());
             trace!("{}", result);
 
+            let coords =
+              if let Some(coords) = coordinates {
+                coords
+              } else {
+                (0, frame_height as u32, 0, frame_width as u32)
+              };
+
             text_analysis.push(FrameAnalysis {
-              coordinates: (0, frame_height as u32, 0, frame_width as u32),
+              coordinates: coords,
               confidence: "NA".to_string(),
               frame: frame_count,
               text: result,
