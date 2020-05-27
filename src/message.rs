@@ -1,26 +1,26 @@
 use mcai_worker_sdk::job::{Job, JobResult, JobStatus};
 use mcai_worker_sdk::{debug, trace};
 use mcai_worker_sdk::{McaiChannel, MessageError, ParametersContainer};
-
-use stainless_ffmpeg::filter_graph::FilterGraph;
-use stainless_ffmpeg::format_context::FormatContext;
-use stainless_ffmpeg::order;
-use stainless_ffmpeg::order::filter_output::FilterOutput;
-use stainless_ffmpeg::order::ParameterValue;
-use stainless_ffmpeg::packet::Packet;
-use stainless_ffmpeg::video_decoder::VideoDecoder;
+use serde::Serialize;
+use stainless_ffmpeg::{
+  filter_graph::FilterGraph, format_context::FormatContext, order,
+  order::filter_output::FilterOutput, order::ParameterValue, packet::Packet,
+  video_decoder::VideoDecoder,
+};
 use stainless_ffmpeg_sys::{
   av_get_bits_per_pixel, av_init_packet, av_packet_alloc, av_pix_fmt_desc_get, av_read_frame,
   AVPixelFormat,
 };
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Error;
+use std::io::Write;
 use std::mem;
 use std::time::Instant;
 
-use serde::Serialize;
-
 pub const SOURCE_PATH_PARAMETER: &str = "source_path";
 pub const LANGUAGE_PARAMETER: &str = "language";
+pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 #[derive(Debug, Serialize)]
 pub struct FrameAnalysis {
@@ -61,6 +61,20 @@ pub fn process(
       )
     })?;
 
+  let destination_path = job
+    .get_string_parameter(DESTINATION_PATH_PARAMETER)
+    .ok_or_else(|| {
+      MessageError::ProcessingError(
+        job_result
+          .clone()
+          .with_status(JobStatus::Error)
+          .with_message(&format!(
+            "Invalid job message: missing expected '{}' parameter.",
+            DESTINATION_PATH_PARAMETER
+          )),
+      )
+    })?;
+
   let result = apply_ocr(&source_path, &language).map_err(|error| {
     MessageError::ProcessingError(
       job_result
@@ -70,25 +84,22 @@ pub fn process(
     )
   })?;
 
-  Ok(
-    job_result
-      .with_status(JobStatus::Completed)
-      .with_message(&result),
-  )
+  to_file(&destination_path, &result)
+    .map_err(|error| MessageError::from(error, job_result.clone()))?;
+
+  Ok(job_result.with_status(JobStatus::Completed))
 }
 
-pub fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
-  let mut context = FormatContext::new(filename).unwrap();
-  context.open_input().unwrap();
+fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
+  let mut context = FormatContext::new(filename)?;
+  context.open_input()?;
 
-  let video_decoder = VideoDecoder::new("h264".to_string(), &context, 0).unwrap();
+  let video_decoder = VideoDecoder::new("h264".to_string(), &context, 0)?;
 
-  let mut graph = FilterGraph::new().unwrap();
+  let mut graph = FilterGraph::new()?;
 
-  graph
-    .add_input_from_video_decoder("video_input", &video_decoder)
-    .unwrap();
-  graph.add_video_output("video_output").unwrap();
+  graph.add_input_from_video_decoder("video_input", &video_decoder)?;
+  graph.add_video_output("video_output")?;
 
   let parameters: HashMap<String, ParameterValue> = [("pix_fmts", "rgb24")]
     .iter()
@@ -106,11 +117,11 @@ pub fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
     }]),
   };
 
-  let filter = graph.add_filter(&filter_definition).unwrap();
-  graph.connect_input("video_input", 0, &filter, 0).unwrap();
-  graph.connect_output(&filter, 0, "video_output", 0).unwrap();
+  let filter = graph.add_filter(&filter_definition)?;
+  graph.connect_input("video_input", 0, &filter, 0)?;
+  graph.connect_output(&filter, 0, "video_output", 0)?;
 
-  graph.validate().unwrap();
+  graph.validate()?;
 
   let mut text_analysis = Vec::new();
   let mut frame_count = 0 as usize;
@@ -188,4 +199,10 @@ pub fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
   let json_result = serde_json::to_string(&text_analysis)
     .map_err(|error| format!("Unable to serialize OCR result: {:?}", error))?;
   Ok(json_result)
+}
+
+fn to_file(destination_path: &str, ocr_result: &str) -> Result<(), Error> {
+  let mut output_file = File::create(destination_path.clone())?;
+  output_file.write_all(ocr_result.as_bytes())?;
+  Ok(())
 }

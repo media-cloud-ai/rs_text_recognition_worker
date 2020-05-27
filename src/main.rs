@@ -45,6 +45,12 @@ It returns the detected text as a JSON array."#
         kind: vec![ParameterType::Integer],
         required: true,
       },
+      Parameter {
+        identifier: message::DESTINATION_PATH_PARAMETER.to_string(),
+        label: "The OCR result file path".to_string(),
+        kind: vec![ParameterType::String],
+        required: true,
+      },
     ]
   }
 
