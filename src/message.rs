@@ -24,7 +24,13 @@ pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
 
 #[derive(Debug, Serialize)]
 pub struct FrameAnalysis {
+  #[serde(rename = "Coords")]
+  coordinates: (u32, u32, u32, u32),
+  #[serde(rename = "Confidence")]
+  confidence: String,
+  #[serde(rename = "Frame")]
   frame: usize,
+  #[serde(rename = "Text")]
   text: String,
 }
 
@@ -171,10 +177,14 @@ fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
             );
 
             debug!("Start OCR with: data={}, language={}", data.len(), language);
+
+            let frame_width = (*video_frame.frame).width;
+            let frame_height = (*video_frame.frame).height;
+
             let result = tesseract::ocr_from_frame(
               &data,
-              (*video_frame.frame).width,
-              (*video_frame.frame).height,
+              frame_width,
+              frame_height,
               bytes_per_pixel,
               (*video_frame.frame).linesize[0],
               language,
@@ -184,6 +194,8 @@ fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
             trace!("{}", result);
 
             text_analysis.push(FrameAnalysis {
+              coordinates: (0, frame_height as u32, 0, frame_width as u32),
+              confidence: "NA".to_string(),
               frame: frame_count,
               text: result,
             });
