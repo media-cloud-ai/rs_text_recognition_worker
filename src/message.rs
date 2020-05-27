@@ -202,7 +202,7 @@ fn apply_ocr(filename: &str, language: &str) -> Result<String, String> {
 }
 
 fn to_file(destination_path: &str, ocr_result: &str) -> Result<(), Error> {
-  let mut output_file = File::create(destination_path.clone())?;
+  let mut output_file = File::create(destination_path)?;
   output_file.write_all(ocr_result.as_bytes())?;
   Ok(())
 }
