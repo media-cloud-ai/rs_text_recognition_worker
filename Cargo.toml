@@ -12,7 +12,7 @@ serde = "1.0.34"
 serde_json = "1.0.34"
 stainless-ffmpeg-sys = "4.2.2-update.1"
 stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg.git", branch = "master" }
-tesseract = "0.5.0"
+tesseract = "0.6.0"
 
 [build-dependencies]
 built = "0.4.1"
