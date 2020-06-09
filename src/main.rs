@@ -42,7 +42,7 @@ It returns the detected text as a JSON array."#
       Parameter {
         identifier: message::LANGUAGE_PARAMETER.to_string(),
         label: "The language to be detected".to_string(),
-        kind: vec![ParameterType::Integer],
+        kind: vec![ParameterType::String],
         required: true,
       },
       Parameter {

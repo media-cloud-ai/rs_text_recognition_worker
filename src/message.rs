@@ -46,7 +46,7 @@ pub fn process(
     get_required_string_parameter_value(job, &job_result, DESTINATION_PATH_PARAMETER)?;
 
   let sample_rate = job
-    .get_integer_parameter(SAMPLE_RATE_PARAMETER)
+    .get_parameter::<i64>(SAMPLE_RATE_PARAMETER)
     .unwrap_or(1);
 
   let result = apply_ocr(&source_path, &language, sample_rate as usize, None).map_err(|error| {
@@ -69,14 +69,15 @@ fn get_required_string_parameter_value(
   job_result: &JobResult,
   parameter_key: &str,
 ) -> Result<String, MessageError> {
-  job.get_string_parameter(parameter_key).ok_or_else(|| {
+  job.get_parameter::<String>(parameter_key).map_err(|e| {
     MessageError::ProcessingError(
       job_result
         .clone()
         .with_status(JobStatus::Error)
         .with_message(&format!(
-          "Invalid job message: missing expected '{}' parameter.",
-          parameter_key
+          "Invalid job message: missing expected '{}' parameter: {:?}",
+          parameter_key,
+          e
         )),
     )
   })
