@@ -4,6 +4,7 @@ use mcai_worker_sdk::worker::{Parameter, ParameterType};
 use mcai_worker_sdk::{McaiChannel, MessageError, MessageEvent, Version};
 
 mod message;
+mod region_of_interest;
 
 pub mod built_info {
   include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -42,7 +43,7 @@ It returns the detected text as a JSON array."#
       Parameter {
         identifier: message::LANGUAGE_PARAMETER.to_string(),
         label: "The language to be detected".to_string(),
-        kind: vec![ParameterType::Integer],
+        kind: vec![ParameterType::String],
         required: true,
       },
       Parameter {
@@ -53,8 +54,14 @@ It returns the detected text as a JSON array."#
       },
       Parameter {
         identifier: message::SAMPLE_RATE_PARAMETER.to_string(),
-        label: "The video sampling rate".to_string(),
+        label: "The video sampling rate (default: 1)".to_string(),
         kind: vec![ParameterType::Integer],
+        required: false,
+      },
+      Parameter {
+        identifier: message::REGION_OF_INTEREST_PARAMETER.to_string(),
+        label: "The part of the frame to focus on.".to_string(),
+        kind: vec![ParameterType::String], // FIXME should be RegionOfInterest
         required: false,
       },
     ]
