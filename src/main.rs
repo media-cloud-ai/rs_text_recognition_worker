@@ -3,12 +3,10 @@ extern crate serde_derive;
 
 use mcai_worker_sdk::{
   start_worker,
-  job::Job,
-  worker::{Parameter, ParameterType},
-  parameter::container::ParametersContainer,
   trace,
   FormatContext,
   Frame,
+  JsonSchema,
   MessageError,
   MessageEvent,
   ProcessResult,
@@ -19,6 +17,8 @@ use stainless_ffmpeg_sys::{
   av_get_bits_per_pixel, av_pix_fmt_desc_get,
   AVPixelFormat,
 };
+
+use std::sync::{Arc, Mutex};
 
 pub mod built_info {
   include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -35,13 +35,14 @@ struct TextRecognitionEvent {
   language: String,
 }
 
-pub const SOURCE_PATH_PARAMETER: &str = "source_path";
-pub const LANGUAGE_PARAMETER: &str = "language";
-pub const DESTINATION_PATH_PARAMETER: &str = "destination_path";
-pub const SAMPLE_RATE_PARAMETER: &str = "sample_rate";
-pub const REGION_OF_INTEREST_PARAMETER: &str = "region_of_interest";
+#[derive(Debug, Deserialize, JsonSchema)]
+struct WorkerParameters {
+  source_path: String,
+  destination_path: String,
+  language: Option<String>
+}
 
-impl MessageEvent for TextRecognitionEvent {
+impl MessageEvent<WorkerParameters> for TextRecognitionEvent {
   fn get_name(&self) -> String {
     "Text recognition".to_string()
   }
@@ -60,46 +61,8 @@ It returns the detected text for each requested frame."#
     Version::parse(built_info::PKG_VERSION).expect("unable to locate Package version")
   }
 
-  fn get_parameters(&self) -> Vec<Parameter> {
-    vec![
-      Parameter {
-        identifier: SOURCE_PATH_PARAMETER.to_string(),
-        label: "Source path".to_string(),
-        kind: vec![ParameterType::String],
-        required: true,
-      },
-      Parameter {
-        identifier: LANGUAGE_PARAMETER.to_string(),
-        label: "The language to be detected".to_string(),
-        kind: vec![ParameterType::String],
-        required: true,
-      },
-      Parameter {
-        identifier: DESTINATION_PATH_PARAMETER.to_string(),
-        label: "The OCR result file path".to_string(),
-        kind: vec![ParameterType::String],
-        required: true,
-      },
-      Parameter {
-        identifier: SAMPLE_RATE_PARAMETER.to_string(),
-        label: "The video sampling rate (default: 1)".to_string(),
-        kind: vec![ParameterType::Integer],
-        required: false,
-      },
-      Parameter {
-        identifier: REGION_OF_INTEREST_PARAMETER.to_string(),
-        label: "The part of the frame to focus on.".to_string(),
-        kind: vec![ParameterType::String], // FIXME should be RegionOfInterest
-        required: false,
-      },
-    ]
-  }
-
-  fn init_process(&mut self, job: &Job, _format_context: &FormatContext) -> Result<Vec<usize>, MessageError> {
-    self.language =
-      job.get_parameter("language").map_err(|e| {
-        MessageError::RuntimeError(e.to_string())
-      })?;
+  fn init_process(&mut self, parameters: WorkerParameters, _format_context: Arc<Mutex<FormatContext>>) -> Result<Vec<usize>, MessageError> {
+    self.language = parameters.language.unwrap_or_else(|| "eng".to_string());
 
     Ok(vec![0])
   }

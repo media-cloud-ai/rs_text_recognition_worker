@@ -4,8 +4,7 @@
 		{
 			"id": "source_path",
 			"type": "string",
-			"store": "environment",
-			"value": "SOURCE_PATH"
+			"value": "srt://:9999"
 		},
 		{
 			"id": "language",

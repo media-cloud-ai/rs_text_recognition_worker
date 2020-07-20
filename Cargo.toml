@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies]
 mcai_worker_sdk = {version = "0.10.4", features = ["media"], path="../mcai_worker_sdk/rs_mcai_worker_sdk"}
+schemars = "0.7.6"
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
