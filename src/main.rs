@@ -14,7 +14,9 @@ use mcai_worker_sdk::{
 };
 
 use stainless_ffmpeg_sys::{
-  av_get_bits_per_pixel, av_pix_fmt_desc_get,
+  av_get_bits_per_pixel,
+  av_pix_fmt_desc_get,
+  AVMediaType,
   AVPixelFormat,
 };
 
@@ -61,10 +63,18 @@ It returns the detected text for each requested frame."#
     Version::parse(built_info::PKG_VERSION).expect("unable to locate Package version")
   }
 
-  fn init_process(&mut self, parameters: WorkerParameters, _format_context: Arc<Mutex<FormatContext>>) -> Result<Vec<usize>, MessageError> {
+  fn init_process(&mut self, parameters: WorkerParameters, format_context: Arc<Mutex<FormatContext>>) -> Result<Vec<usize>, MessageError> {
     self.language = parameters.language.unwrap_or_else(|| "eng".to_string());
 
-    Ok(vec![0])
+    // get first audio stream index
+    let format_context = format_context.lock().unwrap();
+
+    for stream_index in 0..format_context.get_nb_streams() {
+      if format_context.get_stream_type(stream_index as isize) == AVMediaType::AVMEDIA_TYPE_VIDEO {
+        return Ok(vec![stream_index as usize]);
+      }
+    }
+    Err(MessageError::RuntimeError("Missing video stream in the source".to_string()))
   }
 
   fn process_frame(
