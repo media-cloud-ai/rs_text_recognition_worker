@@ -8,13 +8,14 @@ authors = [
 edition = "2018"
 
 [dependencies]
-mcai_worker_sdk = {version = "0.10.4", features = ["media"], path="../mcai_worker_sdk/rs_mcai_worker_sdk"}
+mcai_worker_sdk = { version = "0.11.0", git = "https://github.com/media-cloud-ai/mcai_worker_sdk", branch = "handle_video_source", features = ["media"] }
 schemars = "0.7.6"
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 stainless-ffmpeg-sys = "4.2.3"
-tesseract = "0.6.0"
+tesseract = "0.6.2"
+tesseract-sys = "0.5.3"
 
 [build-dependencies]
 built = "0.4.1"
