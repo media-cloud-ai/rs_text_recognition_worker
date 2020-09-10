@@ -1,0 +1,40 @@
+{
+  "job_id": 666,
+  "parameters": [
+    {
+      "id": "source_path",
+      "type": "string",
+      "value": "/path/to/source_file.ext"
+    },
+    {
+      "id": "language",
+      "type": "string",
+      "value": "eng"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "value": "/path/to/ocr_output.txt"
+    },
+    {
+      "id": "region_of_interest",
+      "type": "string",
+      "value": {
+        "top": 450,
+        "left": 650,
+        "right": 500,
+        "bottom": 500
+      }
+    },
+    {
+      "id": "width",
+      "type": "integer",
+      "value": 400
+    },
+    {
+      "id": "sample_rate",
+      "type": "integer",
+      "value": 2
+    }
+  ]
+}

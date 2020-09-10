@@ -3,7 +3,7 @@ extern crate serde_derive;
 
 use mcai_worker_sdk::{
   start_worker, trace, FormatContext, Frame, JsonSchema, MessageError, MessageEvent, ProcessResult,
-  RegionOfInterest, Scaling, StreamDescriptor, Version,
+  RegionOfInterest, Scaling, StreamDescriptor, Version, VideoFilter, VideoFormat,
 };
 
 use stainless_ffmpeg_sys::{
@@ -11,7 +11,6 @@ use stainless_ffmpeg_sys::{
 };
 
 use mcai_worker_sdk::job::JobResult;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -86,20 +85,25 @@ It returns the detected text for each requested frame."#
 
     for stream_index in 0..format_context.get_nb_streams() {
       if format_context.get_stream_type(stream_index as isize) == AVMediaType::AVMEDIA_TYPE_VIDEO {
-        let mut format_filter_parameters = HashMap::<String, String>::new();
-        format_filter_parameters.insert("pix_fmts".to_string(), "rgb24".to_string());
-
         let scaling = match (parameters.width, parameters.height) {
           (None, None) => None,
           (width, height) => Some(Scaling { width, height }),
         };
 
-        let stream_descriptor = StreamDescriptor::new_video(
-          stream_index as usize,
-          parameters.region_of_interest,
-          scaling,
-          Some(format_filter_parameters),
-        );
+        let mut video_filters = vec![];
+        if let Some(region_of_interest) = parameters.region_of_interest {
+          video_filters.push(VideoFilter::Crop(region_of_interest));
+        }
+
+        if let Some(scaling) = scaling {
+          video_filters.push(VideoFilter::Resize(scaling));
+        }
+
+        video_filters.push(VideoFilter::Format(VideoFormat {
+          pixel_formats: "rgb24".to_string(),
+        }));
+
+        let stream_descriptor = StreamDescriptor::new_video(stream_index as usize, video_filters);
 
         return Ok(vec![stream_descriptor]);
       }
