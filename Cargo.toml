@@ -1,18 +1,21 @@
 [package]
 name = "rs_text_recognition_worker"
 version = "0.1.0"
-authors = ["Valentin NOEL <valentin.noel@media-io.com>"]
+authors = [
+  "Valentin Noel <valentin.noel@media-io.com>",
+  "Marc-Antoine Arnaud <maarnaud@media-io.com>",
+]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-mcai_worker_sdk = "0.10.4"
-serde = "1.0.34"
-serde_json = "1.0.34"
-stainless-ffmpeg-sys = "4.2.2-update.1"
-stainless_ffmpeg = { git = "https://github.com/nomalab/stainless-ffmpeg.git", branch = "master" }
-tesseract = "0.5.0"
+mcai_worker_sdk = { version = "0.11.0", git = "https://github.com/media-cloud-ai/mcai_worker_sdk", branch = "handle_video_source", features = ["media"] }
+schemars = "0.7.6"
+serde = "^1.0"
+serde_derive = "^1.0"
+serde_json = "^1.0"
+stainless-ffmpeg-sys = "4.2.3"
+tesseract = "0.6.2"
+tesseract-sys = "0.5.3"
 
 [build-dependencies]
 built = "0.4.1"
